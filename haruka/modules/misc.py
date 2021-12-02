@@ -210,12 +210,9 @@ def echo(bot: Bot, update: Update):
 @user_is_gbanned
 @run_async
 def reply_keyboard_remove(bot: Bot, update: Update):
-    reply_keyboard = []
-    reply_keyboard.append([
-        ReplyKeyboardRemove(
+    reply_keyboard = [[ReplyKeyboardRemove(
             remove_keyboard=True
-        )
-    ])
+        )]]
     reply_markup = ReplyKeyboardRemove(
         remove_keyboard=True
     )
@@ -264,10 +261,7 @@ def ping(bot: Bot, update: Update):
     print(google)
     text = "*Pong!*\n"
     text += "Average speed to Telegram bot API server - `{}` ms\n".format(tg_api.rtt_avg_ms)
-    if google.rtt_avg:
-        gspeed = google.rtt_avg
-    else:
-        gspeed = google.rtt_avg
+    gspeed = google.rtt_avg
     text += "Average speed to Google - `{}` ms".format(gspeed)
     update.effective_message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
@@ -299,12 +293,8 @@ def github(bot: Bot, update: Update):
 
         for x, y in usr.items():
             if x in whitelist:
-                if x in difnames:
-                    x = difnames[x]
-                else:
-                    x = x.title()
-
-                if x == 'Account created at' or x == 'Last updated':
+                x = difnames.get(x, x.title())
+                if x in ['Account created at', 'Last updated']:
                     y = datetime.strptime(y, "%Y-%m-%dT%H:%M:%SZ")
 
                 if y not in goaway:
@@ -341,28 +331,27 @@ def lyrics(bot: Bot, update: Update, args: List[str]):
     message = update.effective_message
     text = message.text[len('/lyrics '):]
     song = " ".join(args).split("- ")
-    reply_text = f'Looks up for lyrics'
-    
-    if len(song) == 2:
-        while song[1].startswith(" "):
-            song[1] = song[1][1:]
-        while song[0].startswith(" "):
-            song[0] = song[0][1:]
-        while song[1].endswith(" "):
-            song[1] = song[1][:-1]
-        while song[0].endswith(" "):
-            song[0] = song[0][:-1]
-        try:
-            lyrics = "\n".join(PyLyrics.getLyrics(
-                song[0], song[1]).split("\n")[:20])
-        except ValueError as e:
-            return update.effective_message.reply_text("Song %s not found :(" % song[1], failed=True)
-        else:
-            lyricstext = LYRICSINFO % (song[0].replace(
-                " ", "_"), song[1].replace(" ", "_"))
-            return update.effective_message.reply_text(lyrics + lyricstext, parse_mode="MARKDOWN")
-    else:
+    reply_text = 'Looks up for lyrics'
+
+    if len(song) != 2:
         return update.effective_message.reply_text("Invalid syntax! Try Artist - Song name .For example, Luis Fonsi - Despacito", failed=True)
+    while song[1].startswith(" "):
+        song[1] = song[1][1:]
+    while song[0].startswith(" "):
+        song[0] = song[0][1:]
+    while song[1].endswith(" "):
+        song[1] = song[1][:-1]
+    while song[0].endswith(" "):
+        song[0] = song[0][:-1]
+    try:
+        lyrics = "\n".join(PyLyrics.getLyrics(
+            song[0], song[1]).split("\n")[:20])
+    except ValueError as e:
+        return update.effective_message.reply_text("Song %s not found :(" % song[1], failed=True)
+    else:
+        lyricstext = LYRICSINFO % (song[0].replace(
+            " ", "_"), song[1].replace(" ", "_"))
+        return update.effective_message.reply_text(lyrics + lyricstext, parse_mode="MARKDOWN")
 
 
 BASE_URL = 'https://del.dog'
@@ -406,7 +395,7 @@ def paste(bot: Bot, update: Update, args: List[str]):
 def get_paste_content(bot: Bot, update: Update, args: List[str]):
     message = update.effective_message
 
-    if len(args) >= 1:
+    if args:
         key = args[0]
     else:
         message.reply_text("Please supply a paste key!")
@@ -441,7 +430,7 @@ def get_paste_content(bot: Bot, update: Update, args: List[str]):
 def get_paste_stats(bot: Bot, update: Update, args: List[str]):
     message = update.effective_message
 
-    if len(args) >= 1:
+    if args:
         key = args[0]
     else:
         message.reply_text("Please supply a paste key!")

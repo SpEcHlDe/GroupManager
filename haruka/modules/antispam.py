@@ -92,7 +92,7 @@ def gban(bot: Bot, update: Update, args: List[str]):
             message.reply_text("This person is already gbanned, but had no reason set; I've gone and updated it!")
 
         return
-    
+
     ok123 = mention_html(user_chat.id, user_chat.first_name)
 
 
@@ -125,9 +125,7 @@ def gban(bot: Bot, update: Update, args: List[str]):
         try:
             bot.kick_chat_member(chat_id, user_id)
         except BadRequest as excp:
-            if excp.message in GBAN_ERRORS:
-                pass
-            else:
+            if excp.message not in GBAN_ERRORS:
                 message.reply_text("Could not gban due to: {}".format(excp.message))
                 send_to_list(bot, SUDO_USERS + SUPPORT_USERS, "Could not gban due to: {}".format(excp.message))
                 sql.ungban_user(user_id)
@@ -189,9 +187,7 @@ def ungban(bot: Bot, update: Update, args: List[str]):
                 bot.unban_chat_member(chat_id, user_id)
 
         except BadRequest as excp:
-            if excp.message in UNGBAN_ERRORS:
-                pass
-            else:
+            if excp.message not in UNGBAN_ERRORS:
                 message.reply_text("Could not un-gban due to: {}".format(excp.message))
                 bot.send_message(OWNER_ID, "Could not un-gban due to: {}".format(excp.message))
                 return
@@ -325,9 +321,7 @@ def gmute(bot: Bot, update: Update, args: List[str]):
                 pass
             elif excp.message == "Method is available only for supergroups":
                 pass
-            elif excp.message == "Can't demote chat creator":
-                pass
-            else:
+            elif excp.message != "Can't demote chat creator":
                 message.reply_text("Could not gmute due to: {}".format(excp.message))
                 send_to_list(bot, SUDO_USERS + SUPPORT_USERS, "Could not gmute due to: {}".format(excp.message))
                 sql.ungmute_user(user_id)
@@ -398,9 +392,7 @@ def ungmute(bot: Bot, update: Update, args: List[str]):
                 pass
             elif excp.message == "Channel_private":
                 pass
-            elif excp.message == "Chat_admin_required":
-                pass
-            else:
+            elif excp.message != "Chat_admin_required":
                 message.reply_text("Could not un-gmute due to: {}".format(excp.message))
                 bot.send_message(OWNER_ID, "Could not un-gmute due to: {}".format(excp.message))
                 return
@@ -444,50 +436,58 @@ def check_and_mute(bot, update, user_id, should_message=True):
 @run_async
 def enforce_gmute(bot: Bot, update: Update):
     # Not using @restrict handler to avoid spamming - just ignore if cant gmute.
-    if sql.does_chat_gban(update.effective_chat.id) and update.effective_chat.get_member(bot.id).can_restrict_members:
-        user = update.effective_user  # type: Optional[User]
-        chat = update.effective_chat  # type: Optional[Chat]
-        msg = update.effective_message  # type: Optional[Message]
+    if (
+        not sql.does_chat_gban(update.effective_chat.id)
+        or not update.effective_chat.get_member(bot.id).can_restrict_members
+    ):
+        return
+    user = update.effective_user  # type: Optional[User]
+    chat = update.effective_chat  # type: Optional[Chat]
+    msg = update.effective_message  # type: Optional[Message]
 
+    if user and not is_user_admin(chat, user.id):
+        check_and_mute(bot, update, user.id, should_message=True)
+    if msg.new_chat_members:
+        new_members = update.effective_message.new_chat_members
+        for mem in new_members:
+            check_and_mute(bot, update, mem.id, should_message=True)
+    if msg.reply_to_message:
+        user = msg.reply_to_message.from_user  # type: Optional[User]
         if user and not is_user_admin(chat, user.id):
             check_and_mute(bot, update, user.id, should_message=True)
-        if msg.new_chat_members:
-            new_members = update.effective_message.new_chat_members
-            for mem in new_members:
-                check_and_mute(bot, update, mem.id, should_message=True)
-        if msg.reply_to_message:
-            user = msg.reply_to_message.from_user  # type: Optional[User]
-            if user and not is_user_admin(chat, user.id):
-                check_and_mute(bot, update, user.id, should_message=True)
 
 
 @run_async
 def enforce_gban(bot: Bot, update: Update):
     # Not using @restrict handler to avoid spamming - just ignore if cant gban.
-    if sql.does_chat_gban(update.effective_chat.id) and update.effective_chat.get_member(bot.id).can_restrict_members:
-        user = update.effective_user  # type: Optional[User]
-        chat = update.effective_chat  # type: Optional[Chat]
-        msg = update.effective_message  # type: Optional[Message]
+    if (
+        not sql.does_chat_gban(update.effective_chat.id)
+        or not update.effective_chat.get_member(bot.id).can_restrict_members
+    ):
+        return
+    user = update.effective_user  # type: Optional[User]
+    chat = update.effective_chat  # type: Optional[Chat]
+    msg = update.effective_message  # type: Optional[Message]
 
+    if user and not is_user_admin(chat, user.id):
+        check_and_ban(update, user.id)
+
+    if msg.new_chat_members:
+        new_members = update.effective_message.new_chat_members
+        for mem in new_members:
+            check_and_ban(update, mem.id)
+
+    if msg.reply_to_message:
+        user = msg.reply_to_message.from_user  # type: Optional[User]
         if user and not is_user_admin(chat, user.id):
-            check_and_ban(update, user.id)
-
-        if msg.new_chat_members:
-            new_members = update.effective_message.new_chat_members
-            for mem in new_members:
-                check_and_ban(update, mem.id)
-
-        if msg.reply_to_message:
-            user = msg.reply_to_message.from_user  # type: Optional[User]
-            if user and not is_user_admin(chat, user.id):
-                check_and_ban(update, user.id, should_message=False)
+            check_and_ban(update, user.id, should_message=False)
 
 
 @run_async
 @user_admin
 def antispam(bot: Bot, update: Update, args: List[str]):
     chat = update.effective_chat  # type: Optional[Chat]
-    if len(args) > 0:
+    if args:
         if args[0].lower() in ["on", "yes"]:
             sql.enable_antispam(chat.id)
             update.effective_message.reply_text(tld(chat.id, "I've enabled antispam security in this group. This will help protect you "
@@ -529,9 +529,7 @@ def gkick(bot: Bot, update: Update, args: List[str]):
     try:
         user_chat = bot.get_chat(user_id)
     except BadRequest as excp:
-        if excp.message in GKICK_ERRORS:
-            pass
-        else:
+        if excp.message not in GKICK_ERRORS:
             message.reply_text("User cannot be Globally kicked because: {}".format(excp.message))
             return
     except TelegramError:
@@ -546,7 +544,7 @@ def gkick(bot: Bot, update: Update, args: List[str]):
     if int(user_id) == OWNER_ID:
         message.reply_text("Wow! Some's trying to gkick my owner! *Grabs Potato Chips*")
         return
-        
+
     if user_id == bot.id:
         message.reply_text("Well, I'm not gonna gkick myself!")
         return
@@ -561,9 +559,7 @@ def gkick(bot: Bot, update: Update, args: List[str]):
         try:
             bot.unban_chat_member(chat.chat_id, user_id)  # Unban_member = kick (and not ban)
         except BadRequest as excp:
-            if excp.message in GKICK_ERRORS:
-                pass
-            else:
+            if excp.message not in GKICK_ERRORS:
                 message.reply_text("Person cannot be Globally kicked because: {}".format(excp.message))
                 return
         except TelegramError:
@@ -579,29 +575,27 @@ def __user_info__(user_id, chat_id):
     is_gbanned = sql.is_user_gbanned(user_id)
     is_gmuted = sql.is_user_gmuted(user_id)
 
-    if not user_id in SUDO_USERS:
-
-        text = tld(chat_id, "Globally banned: <b>{}</b>")
-        if is_gbanned:
-            text = text.format(tld(chat_id, "Yes"))
-            user = sql.get_gbanned_user(user_id)
-            if user.reason:
-                text += tld(chat_id, "\nReason: {}").format(html.escape(user.reason))
-        else:
-            text = text.format(tld(chat_id, "No"))
-        
-        text += tld(chat_id, "\nGlobally muted: <b>{}</b>")
-        if is_gmuted:
-            text = text.format(tld(chat_id, "Yes"))
-            user = sql.get_gmuted_user(user_id)
-            if user.reason:
-                text += tld(chat_id, "\nReason: {}").format(html.escape(user.reason))
-        else:
-            text = text.format(tld(chat_id, "No"))
-
-        return text
-    else:
+    if user_id in SUDO_USERS:
         return ""
+    text = tld(chat_id, "Globally banned: <b>{}</b>")
+    if is_gbanned:
+        text = text.format(tld(chat_id, "Yes"))
+        user = sql.get_gbanned_user(user_id)
+        if user.reason:
+            text += tld(chat_id, "\nReason: {}").format(html.escape(user.reason))
+    else:
+        text = text.format(tld(chat_id, "No"))
+
+    text += tld(chat_id, "\nGlobally muted: <b>{}</b>")
+    if is_gmuted:
+        text = text.format(tld(chat_id, "Yes"))
+        user = sql.get_gmuted_user(user_id)
+        if user.reason:
+            text += tld(chat_id, "\nReason: {}").format(html.escape(user.reason))
+    else:
+        text = text.format(tld(chat_id, "No"))
+
+    return text
 
 
 def __migrate__(old_chat_id, new_chat_id):

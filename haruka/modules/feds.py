@@ -74,7 +74,7 @@ def new_fed(bot: Bot, update: Update):
 		update.effective_message.reply_text("Do it in PM?")
 		return
 	fednam = message.text.split(None, 1)[1]
-	if not fednam == '':
+	if fednam != '':
 		fed_id = str(uuid.uuid4())
 		fed_name = fednam
 		LOGGER.info(fed_id)
@@ -156,41 +156,37 @@ def fed_chat(bot: Bot, update: Update, args: List[str]):
 
 
 def join_fed(bot: Bot, update: Update, args: List[str]):
-    chat = update.effective_chat  # type: Optional[Chat]
-    user = update.effective_user  # type: Optional[User]
-    message = update.effective_message
-    administrators = chat.get_administrators()
-    fed_id = sql.get_fed_id(chat.id)
+	chat = update.effective_chat  # type: Optional[Chat]
+	user = update.effective_user  # type: Optional[User]
+	message = update.effective_message
+	administrators = chat.get_administrators()
+	fed_id = sql.get_fed_id(chat.id)
 
-    if user.id in SUDO_USERS:
-        pass
-    else:
-        for admin in administrators:
-            status = admin.status
-            if status == "creator":
-                print(admin)
-                if str(admin.user.id) == str(user.id):
-                    pass
-                else:
-                    update.effective_message.reply_text("Only group creator can do it!")
-                    return
-    if fed_id:
-        message.reply_text("Uh, Are you gonna join two federations at one chat?")
-        return
+	if user.id not in SUDO_USERS:
+		for admin in administrators:
+			status = admin.status
+			if status == "creator":
+				print(admin)
+				if str(admin.user.id) != str(user.id):
+					update.effective_message.reply_text("Only group creator can do it!")
+					return
+	if fed_id:
+	    message.reply_text("Uh, Are you gonna join two federations at one chat?")
+	    return
 
-    if len(args) >= 1:
-        fedd = args[0]
-        print(fedd)
-        if sql.search_fed_by_id(fedd) == False:
-            message.reply_text("Please enter valid federation id.")
-            return
+	if args:
+		fedd = args[0]
+		print(fedd)
+		if sql.search_fed_by_id(fedd) == False:
+		    message.reply_text("Please enter valid federation id.")
+		    return
 
-        x = sql.chat_join_fed(fedd, chat.id)
-        if not x:
-                message.reply_text("Failed to join to federation! Due to some errors that basically I have no idea, try reporting it in support group!")
-                return
+		x = sql.chat_join_fed(fedd, chat.id)
+		if not x:
+		        message.reply_text("Failed to join to federation! Due to some errors that basically I have no idea, try reporting it in support group!")
+		        return
 
-        message.reply_text("Chat joined to federation!")
+		message.reply_text("Chat joined to federation!")
 
 
 @run_async
@@ -459,9 +455,7 @@ def fed_ban(bot: Bot, update: Update, args: List[str]):
 			try:
 				bot.kick_chat_member(chat, user_id)
 			except BadRequest as excp:
-				if excp.message in FBAN_ERRORS:
-					pass
-				else:
+				if excp.message not in FBAN_ERRORS:
 					LOGGER.warning("Could not fban on {} because: {}".format(chat, excp.message))
 			except TelegramError:
 				pass
@@ -576,9 +570,7 @@ def unfban(bot: Bot, update: Update, args: List[str]):
 				"""
 
 		except BadRequest as excp:
-			if excp.message in UNFBAN_ERRORS:
-				pass
-			else:
+			if excp.message not in UNFBAN_ERRORS:
 				LOGGER.warning("Cannot remove fban on {} because: {}".format(chat, excp.message))
 		except TelegramError:
 			pass
@@ -623,7 +615,7 @@ def set_frules(bot: Bot, update: Update, args: List[str]):
 		update.effective_message.reply_text("Only fed admins can do this!")
 		return
 
-	if len(args) >= 1:
+	if args:
 		msg = update.effective_message  # type: Optional[Message]
 		raw_text = msg.text
 		args = raw_text.split(None, 1)  # use python's maxsplit to separate cmd and args
@@ -727,9 +719,8 @@ def fed_ban_list(bot: Bot, update: Update, args: List[str], chat_data):
 				else:
 					if user.id not in SUDO_USERS:
 						put_chat(chat.id, new_jam, chat_data)
-			else:
-				if user.id not in SUDO_USERS:
-					put_chat(chat.id, new_jam, chat_data)
+			elif user.id not in SUDO_USERS:
+				put_chat(chat.id, new_jam, chat_data)
 			backups = ""
 			for users in getfban:
 				getuserinfo = sql.get_all_fban_users_target(fed_id, users)
@@ -753,9 +744,8 @@ def fed_ban_list(bot: Bot, update: Update, args: List[str], chat_data):
 				else:
 					if user.id not in SUDO_USERS:
 						put_chat(chat.id, new_jam, chat_data)
-			else:
-				if user.id not in SUDO_USERS:
-					put_chat(chat.id, new_jam, chat_data)
+			elif user.id not in SUDO_USERS:
+				put_chat(chat.id, new_jam, chat_data)
 			backups = "id,firstname,lastname,username,reason\n"
 			for users in getfban:
 				getuserinfo = sql.get_all_fban_users_target(fed_id, users)
@@ -792,9 +782,8 @@ def fed_ban_list(bot: Bot, update: Update, args: List[str], chat_data):
 			else:
 				if user.id not in SUDO_USERS:
 					put_chat(chat.id, new_jam, chat_data)
-		else:
-			if user.id not in SUDO_USERS:
-				put_chat(chat.id, new_jam, chat_data)
+		elif user.id not in SUDO_USERS:
+			put_chat(chat.id, new_jam, chat_data)
 		cleanr = re.compile('<.*?>')
 		cleantext = re.sub(cleanr, '', text)
 		with BytesIO(str.encode(cleantext)) as output:
@@ -890,9 +879,8 @@ def fed_import_bans(bot: Bot, update: Update, chat_data):
 			else:
 				if user.id not in SUDO_USERS:
 					put_chat(chat.id, new_jam, chat_data)
-		else:
-			if user.id not in SUDO_USERS:
-				put_chat(chat.id, new_jam, chat_data)
+		elif user.id not in SUDO_USERS:
+			put_chat(chat.id, new_jam, chat_data)
 		if int(int(msg.reply_to_message.document.file_size)/1024) >= 200:
 			msg.reply_text("This file is too big!")
 			return
@@ -1029,10 +1017,7 @@ def is_user_fed_admin(fed_id, user_id):
 		return True
 	if fed_admins == False:
 		return False
-	if int(user_id) in fed_admins:
-		return True
-	else:
-		return False
+	return int(user_id) in fed_admins
 
 
 def is_user_fed_owner(fed_id, user_id):
@@ -1040,13 +1025,10 @@ def is_user_fed_owner(fed_id, user_id):
 	if getsql == False:
 		return False
 	getfedowner = eval(getsql['fusers'])
-	if getfedowner == None or getfedowner == False:
+	if getfedowner is None or getfedowner == False:
 		return False
 	getfedowner = getfedowner['owner']
-	if str(user_id) == getfedowner or user_id == 388576209:
-		return True
-	else:
-		return False
+	return str(user_id) == getfedowner or user_id == 388576209
 
 
 @run_async
@@ -1095,17 +1077,13 @@ def __user_info__(user_id, chat_id):
 # Temporary data
 def put_chat(chat_id, value, chat_data):
 	# print(chat_data)
-	if value == False:
-		status = False
-	else:
-		status = True
+	status = value != False
 	chat_data[chat_id] = {'federation': {"status": status, "value": value}}
 
 def get_chat(chat_id, chat_data):
 	# print(chat_data)
 	try:
-		value = chat_data[chat_id]['federation']
-		return value
+		return chat_data[chat_id]['federation']
 	except KeyError:
 		return {"status": False, "value": False}
 

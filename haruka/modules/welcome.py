@@ -117,7 +117,7 @@ def new_member(bot: Bot, update: Update):
 
             else:
                 # If welcome message is media, send with appropriate function
-                if welc_type != sql.Types.TEXT and welc_type != sql.Types.BUTTON_TEXT:
+                if welc_type not in [sql.Types.TEXT, sql.Types.BUTTON_TEXT]:
                     reply = update.message.message_id
                     cleanserv = sql.clean_service(chat.id)
                     # Clean service welcome
@@ -135,10 +135,7 @@ def new_member(bot: Bot, update: Update):
                         fullname = first_name
                     count = chat.get_members_count()
                     mention = mention_html(new_mem.id, first_name)
-                    if new_mem.username:
-                        username = "@" + escape(new_mem.username)
-                    else:
-                        username = mention
+                    username = "@" + escape(new_mem.username) if new_mem.username else mention
                     formatted_text = cust_welcome.format(first=escape(first_name),
                                               last=escape(new_mem.last_name or first_name),
                                               fullname=escape(fullname), username=username, mention=mention,
@@ -197,11 +194,7 @@ def new_member(bot: Bot, update: Update):
                         fullname = first_name
                     count = chat.get_members_count()
                     mention = mention_html(new_mem.id, first_name)
-                    if new_mem.username:
-                        username = "@" + escape(new_mem.username)
-                    else:
-                        username = mention
-
+                    username = "@" + escape(new_mem.username) if new_mem.username else mention
                     valid_format = escape_invalid_curly_brackets(cust_welcome, VALID_WELCOME_FORMATTERS)
                     res = valid_format.format(first=escape(first_name),
                                               last=escape(new_mem.last_name or first_name),
@@ -305,7 +298,7 @@ def left_member(bot: Bot, update: Update):
                 return
 
             # if media goodbye, use appropriate function for it
-            if goodbye_type != sql.Types.TEXT and goodbye_type != sql.Types.BUTTON_TEXT:
+            if goodbye_type not in [sql.Types.TEXT, sql.Types.BUTTON_TEXT]:
                 reply = update.message.message_id
                 cleanserv = sql.clean_service(chat.id)
                 # Clean service welcome
@@ -323,10 +316,7 @@ def left_member(bot: Bot, update: Update):
                     fullname = first_name
                 count = chat.get_members_count()
                 mention = mention_html(left_mem.id, first_name)
-                if left_mem.username:
-                    username = "@" + escape(left_mem.username)
-                else:
-                    username = mention
+                username = "@" + escape(left_mem.username) if left_mem.username else mention
                 formatted_text = cust_goodbye.format(first=escape(first_name),
                                               last=escape(left_mem.last_name or first_name),
                                               fullname=escape(fullname), username=username, mention=mention,
@@ -347,11 +337,7 @@ def left_member(bot: Bot, update: Update):
                     fullname = first_name
                 count = chat.get_members_count()
                 mention = mention_html(left_mem.id, first_name)
-                if left_mem.username:
-                    username = "@" + escape(left_mem.username)
-                else:
-                    username = mention
-
+                username = "@" + escape(left_mem.username) if left_mem.username else mention
                 valid_format = escape_invalid_curly_brackets(cust_goodbye, VALID_WELCOME_FORMATTERS)
                 res = valid_format.format(first=escape(first_name),
                                           last=escape(left_mem.last_name or first_name),
@@ -374,9 +360,9 @@ def left_member(bot: Bot, update: Update):
 def security(bot: Bot, update: Update, args: List[str]) -> str:
     chat = update.effective_chat  # type: Optional[Chat]
     getcur, cur_value, cust_text = sql.welcome_security(chat.id)
-    if len(args) >= 1:
+    if args:
         var = args[0].lower()
-        if (var == "yes" or var == "y" or var == "on"):
+        if var in ["yes", "y", "on"]:
             check = bot.getChatMember(chat.id, bot.id)
             if check.status == 'member' or check['can_restrict_members'] == False:
                 text = "I can't limit people here! Make sure I'm an admin so I can mute someone!"
@@ -384,17 +370,14 @@ def security(bot: Bot, update: Update, args: List[str]) -> str:
                 return ""
             sql.set_welcome_security(chat.id, True, str(cur_value), cust_text)
             update.effective_message.reply_text("Welcomemute have been enabled! New members will be muted until they clicked the button!")
-        elif (var == "no" or var == "n" or var == "off"):
+        elif var in ["no", "n", "off"]:
             sql.set_welcome_security(chat.id, False, str(cur_value), cust_text)
             update.effective_message.reply_text("Welcomemute have been disabled! New members will not be muted anymore!")
         else:
             update.effective_message.reply_text("Please type `on`/`yes` or `off`/`no`!", parse_mode=ParseMode.MARKDOWN)
     else:
         getcur, cur_value, cust_text = sql.welcome_security(chat.id)
-        if getcur:
-            getcur = "True"
-        else:
-            getcur = "False"
+        getcur = "True" if getcur else "False"
         if cur_value[:1] == "0":
             cur_value = "None"
         text = "Current setting is::\nWelcome security: `{}`\nMember will be muted for: `{}`\nCustom Text for Unmute button: `{}`".format(getcur, cur_value, cust_text)
@@ -407,7 +390,7 @@ def security_mute(bot: Bot, update: Update, args: List[str]) -> str:
     chat = update.effective_chat  # type: Optional[Chat]
     message = update.effective_message  # type: Optional[Message]
     getcur, cur_value, cust_text = sql.welcome_security(chat.id)
-    if len(args) >= 1:
+    if args:
         var = args[0]
         if var[:1] == "0":
             mutetime = "0"
@@ -420,11 +403,10 @@ def security_mute(bot: Bot, update: Update, args: List[str]) -> str:
             sql.set_welcome_security(chat.id, getcur, str(var), cust_text)
             text = "Every new member will be muted for {} until they press the welcome button!".format(var)
         update.effective_message.reply_text(text)
+    elif str(cur_value) == "0":
+        update.effective_message.reply_text("Current settings: New members will be mute forever until they press the button!")
     else:
-        if str(cur_value) == "0":
-            update.effective_message.reply_text("Current settings: New members will be mute forever until they press the button!")
-        else:
-            update.effective_message.reply_text("Current settings: New members will be mute for {} until they press the button!".format(cur_value))
+        update.effective_message.reply_text("Current settings: New members will be mute for {} until they press the button!".format(cur_value))
 
 
 @run_async
@@ -433,7 +415,7 @@ def security_text(bot: Bot, update: Update, args: List[str]) -> str:
     chat = update.effective_chat  # type: Optional[Chat]
     message = update.effective_message  # type: Optional[Message]
     getcur, cur_value, cust_text = sql.welcome_security(chat.id)
-    if len(args) >= 1:
+    if args:
         text = " ".join(args)
         sql.set_welcome_security(chat.id, getcur, cur_value, text)
         text = "The text of button have been changed to: `{}`".format(text)
@@ -456,25 +438,25 @@ def security_text_reset(bot: Bot, update: Update):
 @user_admin
 def cleanservice(bot: Bot, update: Update, args: List[str]) -> str:
     chat = update.effective_chat  # type: Optional[Chat]
-    if chat.type != chat.PRIVATE:
-        if len(args) >= 1:
-            var = args[0]
-            if (var == "no" or var == "off"):
-                sql.set_clean_service(chat.id, False)
-                update.effective_message.reply_text("I'll leave service messages")
-            elif(var == "yes" or var == "on"):
-                sql.set_clean_service(chat.id, True)
-                update.effective_message.reply_text("I will clean service messages")
-            else:
-                update.effective_message.reply_text("Please enter yes or no!", parse_mode=ParseMode.MARKDOWN)
-        else:
-            update.effective_message.reply_text("Please enter yes or no!", parse_mode=ParseMode.MARKDOWN)
-    else:
+    if chat.type == chat.PRIVATE:
         curr = sql.clean_service(chat.id)
         if curr:
             update.effective_message.reply_text("I will now clean `x joined the group` message!", parse_mode=ParseMode.MARKDOWN)
         else:
             update.effective_message.reply_text("I will no longer clean `x joined the group` message!", parse_mode=ParseMode.MARKDOWN)
+
+    elif args:
+        var = args[0]
+        if var in ["no", "off"]:
+            sql.set_clean_service(chat.id, False)
+            update.effective_message.reply_text("I'll leave service messages")
+        elif var in ["yes", "on"]:
+            sql.set_clean_service(chat.id, True)
+            update.effective_message.reply_text("I will clean service messages")
+        else:
+            update.effective_message.reply_text("Please enter yes or no!", parse_mode=ParseMode.MARKDOWN)
+    else:
+        update.effective_message.reply_text("Please enter yes or no!", parse_mode=ParseMode.MARKDOWN)
 
 
 

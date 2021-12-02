@@ -68,12 +68,11 @@ def get(bot, update, notename, show_none=True, no_format=False):
 				try:
 					bot.forward_message(chat_id=chat_id, from_chat_id=MESSAGE_DUMP, message_id=note.value)
 				except BadRequest as excp:
-					if excp.message == "Message to forward not found":
-                                                message.reply_text("This message seems to have been lost - I'll remove it "
-                                                                                   "from your notes list.")
-                                                sql.rm_note(chat_id, notename)
-					else:
+					if excp.message != "Message to forward not found":
 						raise
+					message.reply_text("This message seems to have been lost - I'll remove it "
+					                                   "from your notes list.")
+					sql.rm_note(chat_id, notename)
 			else:
 				try:
 					bot.forward_message(chat_id=chat_id, from_chat_id=chat_id, message_id=note.value)
@@ -113,7 +112,6 @@ def get(bot, update, notename, show_none=True, no_format=False):
 							failtext += "\n\n```\n{}```".format(note.value + revert_buttons(buttons))
 							message.reply_text(failtext, parse_mode="markdown")
 						print("Gagal mengirim catatan: " + excp.message)
-						pass
 				else:
 					ENUM_FUNC_MAP[note.msgtype](send_id, note.file, caption=text, reply_to_message_id=reply_id,
 												parse_mode=parseMode, disable_web_page_preview=True,
@@ -170,11 +168,7 @@ def save(bot: Bot, update: Update):
 		chat_name = dispatcher.bot.getChat(conn).title
 	else:
 		chat_id = update.effective_chat.id
-		if chat.type == "private":
-			chat_name = "local notes"
-		else:
-			chat_name = chat.title
-
+		chat_name = "local notes" if chat.type == "private" else chat.title
 	msg = update.effective_message  # type: Optional[Message]
 
 	note_name, text, data_type, content, buttons = get_note_type(msg)
@@ -197,61 +191,57 @@ def save(bot: Bot, update: Update):
 @run_async
 @user_admin
 def clear(bot: Bot, update: Update, args: List[str]):
-    chat = update.effective_chat  # type: Optional[Chat]
-    user = update.effective_user  # type: Optional[User]
-    conn = connected(bot, update, chat, user.id)
-    if not conn == False:
-        chat_id = conn
-        chat_name = dispatcher.bot.getChat(conn).title
-    else:
-        chat_id = update.effective_chat.id
-        if chat.type == "private":
-            chat_name = "local notes"
-        else:
-            chat_name = chat.title
+	chat = update.effective_chat  # type: Optional[Chat]
+	user = update.effective_user  # type: Optional[User]
+	conn = connected(bot, update, chat, user.id)
+	if conn != False:
+		chat_id = conn
+		chat_name = dispatcher.bot.getChat(conn).title
+	else:
+		chat_id = update.effective_chat.id
+		chat_name = "local notes" if chat.type == "private" else chat.title
+	if args:
+		notename = args[0]
 
-    if len(args) >= 1:
-        notename = args[0]
-
-        if sql.rm_note(chat_id, notename):
-            update.effective_message.reply_text("Note succesfully removed from *{}*.".format(chat_name), parse_mode=ParseMode.MARKDOWN)
-        else:
-            update.effective_message.reply_text("That's not a note in my database!")
+		if sql.rm_note(chat_id, notename):
+		    update.effective_message.reply_text("Note succesfully removed from *{}*.".format(chat_name), parse_mode=ParseMode.MARKDOWN)
+		else:
+		    update.effective_message.reply_text("That's not a note in my database!")
 
 
 @run_async
 def list_notes(bot: Bot, update: Update):
-    chat = update.effective_chat  # type: Optional[Chat]
-    user = update.effective_user  # type: Optional[User]
-    conn = connected(bot, update, chat, user.id, need_admin=False)
-    if not conn == False:
-        chat_id = conn
-        chat_name = dispatcher.bot.getChat(conn).title
-        msg = "*Notes in {}:*\n"
-    else:
-        chat_id = update.effective_chat.id
-        if chat.type == "private":
-            chat_name = ""
-            msg = "*Local Notes:*\n"
-        else:
-            chat_name = chat.title
-            msg = "*Notes in {}:*\n"
+	chat = update.effective_chat  # type: Optional[Chat]
+	user = update.effective_user  # type: Optional[User]
+	conn = connected(bot, update, chat, user.id, need_admin=False)
+	if conn != False:
+		chat_id = conn
+		chat_name = dispatcher.bot.getChat(conn).title
+		msg = "*Notes in {}:*\n"
+	else:
+		chat_id = update.effective_chat.id
+		if chat.type == "private":
+		    chat_name = ""
+		    msg = "*Local Notes:*\n"
+		else:
+		    chat_name = chat.title
+		    msg = "*Notes in {}:*\n"
 
-    note_list = sql.get_all_chat_notes(chat_id)
+	note_list = sql.get_all_chat_notes(chat_id)
 
-    for note in note_list:
-        note_name = " • `#{}`\n".format(note.name)
-        if len(msg) + len(note_name) > MAX_MESSAGE_LENGTH:
-            update.effective_message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
-            msg = ""
-        msg += note_name
+	for note in note_list:
+	    note_name = " • `#{}`\n".format(note.name)
+	    if len(msg) + len(note_name) > MAX_MESSAGE_LENGTH:
+	        update.effective_message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+	        msg = ""
+	    msg += note_name
 
-    if not note_list:
-        update.effective_message.reply_text("No notes in *{}*!".format(chat_name), parse_mode=ParseMode.MARKDOWN)
+	if not note_list:
+	    update.effective_message.reply_text("No notes in *{}*!".format(chat_name), parse_mode=ParseMode.MARKDOWN)
 
-    elif len(msg) != 0:
-        msg += "\nYou can retrieve these notes by using `/get notename`, or `#notename`"
-        update.effective_message.reply_text(msg.format(chat_name), parse_mode=ParseMode.MARKDOWN)
+	elif len(msg) != 0:
+	    msg += "\nYou can retrieve these notes by using `/get notename`, or `#notename`"
+	    update.effective_message.reply_text(msg.format(chat_name), parse_mode=ParseMode.MARKDOWN)
 
 
 def __import_data__(chat_id, data):

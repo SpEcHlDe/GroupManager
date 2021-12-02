@@ -161,7 +161,5 @@ def user_is_gbanned(func):
     def is_user_gbanned(bot: Bot, update: Update, *args, **kwargs):
         if not sql.is_user_gbanned(update.effective_user.id):
             return func(bot, update, *args, **kwargs)
-        else:
-            pass
     return is_user_gbanned
 
